@@ -569,12 +569,16 @@ struct MultiStageData<T> {
     vs: T,
     fs: T,
     cs: T,
+    ts: T,
+    ms: T
 }
 
 const NAGA_STAGES: MultiStageData<naga::ShaderStage> = MultiStageData {
     vs: naga::ShaderStage::Vertex,
     fs: naga::ShaderStage::Fragment,
     cs: naga::ShaderStage::Compute,
+    ts: naga::ShaderStage::Task,
+    ms: naga::ShaderStage::Mesh
 };
 
 impl<T> ops::Index<naga::ShaderStage> for MultiStageData<T> {
@@ -584,6 +588,8 @@ impl<T> ops::Index<naga::ShaderStage> for MultiStageData<T> {
             naga::ShaderStage::Vertex => &self.vs,
             naga::ShaderStage::Fragment => &self.fs,
             naga::ShaderStage::Compute => &self.cs,
+            naga::ShaderStage::Task => &self.ts,
+            naga::ShaderStage::Mesh => &self.ms
         }
     }
 }
@@ -594,6 +600,8 @@ impl<T> MultiStageData<T> {
             vs: fun(&self.vs),
             fs: fun(&self.fs),
             cs: fun(&self.cs),
+            ts: fun(&self.ts),
+            ms: fun(&self.ms)
         }
     }
     fn map<Y>(self, fun: impl Fn(T) -> Y) -> MultiStageData<Y> {
@@ -601,6 +609,8 @@ impl<T> MultiStageData<T> {
             vs: fun(self.vs),
             fs: fun(self.fs),
             cs: fun(self.cs),
+            ts: fun(self.ts),
+            ms: fun(self.ms)
         }
     }
     fn iter<'a>(&'a self) -> impl Iterator<Item = &'a T> {

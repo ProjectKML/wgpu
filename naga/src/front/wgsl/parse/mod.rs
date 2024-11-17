@@ -1,3 +1,4 @@
+use std::ops::Index;
 use crate::diagnostic_filter::{
     self, DiagnosticFilter, DiagnosticFilterMap, DiagnosticFilterNode, FilterableTriggeringRule,
     ShouldConflictOnFullDuplicate,
@@ -12,7 +13,8 @@ use crate::front::wgsl::parse::lexer::{Lexer, Token};
 use crate::front::wgsl::parse::number::Number;
 use crate::front::wgsl::Scalar;
 use crate::front::SymbolTable;
-use crate::{Arena, FastIndexSet, Handle, ShaderStage, Span};
+use crate::{Arena, FastIndexSet, Handle, MeshPrimitiveType, ShaderStage, Span, Type};
+use crate::wgsl::parse::ast::FunctionArgument;
 
 pub mod ast;
 pub mod conv;
@@ -1509,6 +1511,32 @@ impl Parser {
             "ray_query" => ast::Type::RayQuery,
             "RayDesc" => ast::Type::RayDesc,
             "RayIntersection" => ast::Type::RayIntersection,
+            "mesh" => {
+                lexer.expect_generic_paren('<')?;
+
+                let vertex_type = self.type_decl(lexer, ctx)?;
+                lexer.expect(Token::Separator(','))?;
+                let index_type = self.type_decl(lexer, ctx)?;
+                lexer.expect(Token::Separator(','))?;
+                let max_vertices = self.unary_expression(lexer, ctx)?;
+                lexer.expect(Token::Separator(','))?;
+                let max_primitives = self.unary_expression(lexer, ctx)?;
+                let primitive_type = if lexer.skip(Token::Separator(',')) {
+                    Some(self.type_decl(lexer, ctx)?)
+                } else {
+                    None
+                };
+
+                lexer.expect_generic_paren('>')?;
+
+                ast::Type::Mesh {
+                    vertex_type,
+                    index_type,
+                    max_vertices,
+                    max_primitives,
+                    primitive_type,
+                }
+            }
             _ => return Ok(None),
         }))
     }
@@ -1665,6 +1693,7 @@ impl Parser {
         lexer: &mut Lexer<'a>,
         context: &mut ExpressionContext<'a, '_, '_>,
         block: &mut ast::Block<'a>,
+        arguments: &[FunctionArgument<'a>]
     ) -> Result<(), Error<'a>> {
         let span_start = lexer.start_byte_offset();
         match lexer.peek() {
@@ -1675,9 +1704,30 @@ impl Parser {
                 match lexer.peek() {
                     (Token::Paren('('), _) => {
                         self.function_statement(lexer, name, span, span_start, context, block)
-                    }
+                    },
+
                     _ => {
                         *lexer = cloned;
+
+                        //We check for a mesh param
+                        let arg = arguments.iter().find(|e| {
+                            e.name.name == name
+                        });
+
+                        if let Some(arg) = arg {
+                            let ty = arg.ty.clone();
+                            let ty = context.types.get_mut(ty);
+
+                            let is_mesh = match ty {
+                                ast::Type::Mesh { ..} => true,
+                                _ => false
+                            };
+
+                            if is_mesh {
+                                panic!()
+                            }
+                        }
+
                         self.assignment_statement(lexer, context, block)
                     }
                 }
@@ -1691,6 +1741,7 @@ impl Parser {
         lexer: &mut Lexer<'a>,
         ctx: &mut ExpressionContext<'a, '_, '_>,
         block: &mut ast::Block<'a>,
+        arguments: &[FunctionArgument<'a>],
         brace_nesting_level: u8,
     ) -> Result<(), Error<'a>> {
         self.push_rule_span(Rule::Statement, lexer);
@@ -1951,7 +2002,7 @@ impl Parser {
                                 let ctx = &mut *ctx;
                                 let block = &mut *block;
                                 lexer.capture_span(|lexer| {
-                                    self.statement(lexer, ctx, block, brace_nesting_level)
+                                    self.statement(lexer, ctx, block, &arguments, brace_nesting_level)
                                 })?
                             };
 
@@ -1994,7 +2045,7 @@ impl Parser {
                                 lexer,
                                 ctx,
                                 &mut continuing,
-                            )?;
+                            arguments)?;
                             lexer.expect(Token::Paren(')'))?;
                         }
 
@@ -2051,7 +2102,7 @@ impl Parser {
                     }
                     // assignment or a function call
                     _ => {
-                        self.function_call_or_assignment_statement(lexer, ctx, block)?;
+                        self.function_call_or_assignment_statement(lexer, ctx, block, arguments)?;
                         lexer.expect(Token::Separator(';'))?;
                         self.pop_rule_span(lexer);
                         return Ok(());
@@ -2123,7 +2174,7 @@ impl Parser {
                         break;
                     } else {
                         // Otherwise try to parse a statement
-                        self.statement(lexer, ctx, &mut continuing, brace_nesting_level)?;
+                        self.statement(lexer, ctx, &mut continuing, &[], brace_nesting_level)?;
                     }
                 }
                 // Since the continuing block must be the last part of the loop body,
@@ -2137,7 +2188,7 @@ impl Parser {
                 break;
             }
             // Otherwise try to parse a statement
-            self.statement(lexer, ctx, &mut body, brace_nesting_level)?;
+            self.statement(lexer, ctx, &mut body, &[], brace_nesting_level)?;
         }
 
         ctx.local_table.pop_scope();
@@ -2190,7 +2241,7 @@ impl Parser {
         let brace_nesting_level = Self::increase_brace_nesting(brace_nesting_level, brace_span)?;
         let mut block = ast::Block::default();
         while !lexer.skip(Token::Paren('}')) {
-            self.statement(lexer, ctx, &mut block, brace_nesting_level)?;
+            self.statement(lexer, ctx, &mut block, &[], brace_nesting_level)?;
         }
 
         ctx.local_table.pop_scope();
@@ -2281,7 +2332,7 @@ impl Parser {
         let brace_nesting_level = 1;
         let mut body = ast::Block::default();
         while !lexer.skip(Token::Paren('}')) {
-            self.statement(lexer, &mut ctx, &mut body, brace_nesting_level)?;
+            self.statement(lexer, &mut ctx, &mut body, &arguments, brace_nesting_level)?;
         }
 
         ctx.local_table.pop_scope();
@@ -2345,6 +2396,8 @@ impl Parser {
             (ParsedAttribute::default(), ParsedAttribute::default());
         let mut id = ParsedAttribute::default();
 
+        let mut mesh_primitive_type = ParsedAttribute::default();
+
         let mut dependencies = FastIndexSet::default();
         let mut ctx = ExpressionContext {
             expressions: &mut out.expressions,
@@ -2401,6 +2454,35 @@ impl Parser {
                 "compute" => {
                     stage.set(ShaderStage::Compute, name_span)?;
                     compute_span = name_span;
+                }
+                "task" => {
+                    stage.set(ShaderStage::Task, name_span)?;
+                }
+                "mesh" => {
+                    stage.set(ShaderStage::Mesh, name_span)?;
+                    lexer.expect(Token::Paren('('))?;
+                    match lexer.next() {
+                        (Token::Word(word), span) => {
+                            let t = match word {
+                                "points" => MeshPrimitiveType::Points,
+                                "lines" => MeshPrimitiveType::Lines,
+                                "triangles" => MeshPrimitiveType::Triangles,
+                                _ => return Err(Error::Unexpected(
+                                    span,
+                                    ExpectedToken::Identifier,
+                                ))
+                            };
+
+                            mesh_primitive_type.set(t, name_span)?;
+                        }
+                        other => {
+                            return Err(Error::Unexpected(
+                                other.1,
+                                ExpectedToken::Identifier,
+                            ))
+                        }
+                    }
+                    lexer.expect(Token::Paren(')'))?;
                 }
                 "workgroup_size" => {
                     lexer.expect(Token::Paren('('))?;
@@ -2533,17 +2615,19 @@ impl Parser {
                     diagnostic_filters,
                     out.diagnostic_filter_leaf,
                 );
+
                 let function =
                     self.function_decl(lexer, diagnostic_filter_leaf, out, &mut dependencies)?;
                 Some(ast::GlobalDeclKind::Fn(ast::Function {
                     entry_point: if let Some(stage) = stage.value {
-                        if stage == ShaderStage::Compute && workgroup_size.value.is_none() {
+                        if (stage == ShaderStage::Compute || stage == ShaderStage::Task || stage == ShaderStage::Mesh) && workgroup_size.value.is_none() {
                             return Err(Error::MissingWorkgroupSize(compute_span));
                         }
                         Some(ast::EntryPoint {
                             stage,
                             early_depth_test: early_depth_test.value,
                             workgroup_size: workgroup_size.value,
+                            mesh_primitive_type: mesh_primitive_type.value
                         })
                     } else {
                         None

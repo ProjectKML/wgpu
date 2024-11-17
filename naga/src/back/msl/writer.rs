@@ -4954,6 +4954,8 @@ template <typename A>
                     LocationMode::Uniform,
                     false,
                 ),
+                crate::ShaderStage::Task { .. } => todo!(),
+                crate::ShaderStage::Mesh { .. } => todo!()
             };
 
             // Should this entry point be modified to do vertex pulling?

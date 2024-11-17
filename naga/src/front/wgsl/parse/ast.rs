@@ -2,7 +2,7 @@ use crate::diagnostic_filter::DiagnosticFilterNode;
 use crate::front::wgsl::parse::directive::enable_extension::EnableExtensions;
 use crate::front::wgsl::parse::number::Number;
 use crate::front::wgsl::Scalar;
-use crate::{Arena, FastIndexSet, Handle, Span};
+use crate::{Arena, FastIndexSet, Handle, MeshPrimitiveType, Span};
 use std::hash::Hash;
 
 #[derive(Debug, Default)]
@@ -121,6 +121,7 @@ pub struct EntryPoint<'a> {
     pub stage: crate::ShaderStage,
     pub early_depth_test: Option<crate::EarlyDepthTest>,
     pub workgroup_size: Option<[Option<Handle<Expression<'a>>>; 3]>,
+    pub mesh_primitive_type: Option<MeshPrimitiveType>
 }
 
 #[cfg(doc)]
@@ -247,6 +248,13 @@ pub enum Type<'a> {
     BindingArray {
         base: Handle<Type<'a>>,
         size: ArraySize<'a>,
+    },
+    Mesh {
+        vertex_type: Handle<Type<'a>>,
+        index_type: Handle<Type<'a>>,
+        max_vertices: Handle<Expression<'a>>,
+        max_primitives: Handle<Expression<'a>>,
+        primitive_type: Option<Handle<Type<'a>>>
     },
 
     /// A user-defined type, like a struct or a type alias.

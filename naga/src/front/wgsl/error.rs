@@ -305,7 +305,7 @@ pub(crate) enum Error<'a> {
     DiagnosticAttributeNotSupported {
         on_what_plural: &'static str,
         spans: Vec<Span>,
-    },
+    }
 }
 
 impl<'a> From<ConflictingDiagnosticRuleError> for Error<'a> {

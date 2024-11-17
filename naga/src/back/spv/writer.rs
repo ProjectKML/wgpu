@@ -762,6 +762,8 @@ impl Writer {
                 .to_words(&mut self.logical_layout.execution_modes);
                 spirv::ExecutionModel::GLCompute
             }
+            crate::ShaderStage::Task => todo!(),
+            crate::ShaderStage::Mesh => todo!(),
         };
         //self.check(exec_model.required_capabilities())?;
 

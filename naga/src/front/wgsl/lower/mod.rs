@@ -3088,6 +3088,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             ast::Type::RayIntersection => {
                 return Ok(ctx.module.generate_ray_intersection_type());
             }
+            ast::Type::Mesh { .. } => todo!(),
             ast::Type::User(ref ident) => {
                 return match ctx.globals.get(ident.name) {
                     Some(&LoweredGlobalDecl::Type(handle)) => Ok(handle),

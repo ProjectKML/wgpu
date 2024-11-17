@@ -187,6 +187,8 @@ impl<W: Write> Writer<W> {
                     Attribute::Stage(ShaderStage::Compute),
                     Attribute::WorkGroupSize(ep.workgroup_size),
                 ],
+                ShaderStage::Task => todo!(),
+                ShaderStage::Mesh => todo!()
             };
 
             self.write_attributes(&attributes)?;
@@ -228,6 +230,8 @@ impl<W: Write> Writer<W> {
                     ShaderStage::Compute => "ComputeOutput",
                     ShaderStage::Fragment => "FragmentOutput",
                     ShaderStage::Vertex => "VertexOutput",
+                    ShaderStage::Task => "TaskOutput",
+                    ShaderStage::Mesh => "MeshOutput"
                 };
 
                 write!(self.out, "{name}")?;
@@ -350,6 +354,8 @@ impl<W: Write> Writer<W> {
                         ShaderStage::Vertex => "vertex",
                         ShaderStage::Fragment => "fragment",
                         ShaderStage::Compute => "compute",
+                        ShaderStage::Task => "task",
+                        ShaderStage::Mesh => "mesh"
                     };
                     write!(self.out, "@{stage_str} ")?;
                 }

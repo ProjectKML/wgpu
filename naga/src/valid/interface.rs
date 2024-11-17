@@ -228,6 +228,8 @@ impl VaryingContext<'_> {
                             St::Vertex => self.output,
                             St::Fragment => !self.output,
                             St::Compute => false,
+                            St::Task => false,
+                            St::Mesh => self.output
                         },
                         *ty_inner
                             == Ti::Vector {
@@ -237,8 +239,9 @@ impl VaryingContext<'_> {
                     ),
                     Bi::ViewIndex => (
                         match self.stage {
-                            St::Vertex | St::Fragment => !self.output,
+                            St::Vertex | St::Mesh | St::Fragment => !self.output,
                             St::Compute => false,
+                            St::Task => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::I32),
                     ),
@@ -284,7 +287,7 @@ impl VaryingContext<'_> {
                     ),
                     Bi::SubgroupSize | Bi::SubgroupInvocationId => (
                         match self.stage {
-                            St::Compute | St::Fragment => !self.output,
+                            St::Compute | St::Task | St::Mesh | St::Fragment => !self.output,
                             St::Vertex => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
@@ -374,9 +377,9 @@ impl VaryingContext<'_> {
                 }
 
                 let needs_interpolation = match self.stage {
-                    crate::ShaderStage::Vertex => self.output,
+                    crate::ShaderStage::Vertex | crate::ShaderStage::Mesh => self.output,
                     crate::ShaderStage::Fragment => !self.output,
-                    crate::ShaderStage::Compute => false,
+                    crate::ShaderStage::Compute | crate::ShaderStage::Task => false,
                 };
 
                 // It doesn't make sense to specify a sampling when `interpolation` is `Flat`, but
@@ -648,6 +651,8 @@ impl super::Validator {
                 crate::ShaderStage::Vertex => ShaderStages::VERTEX,
                 crate::ShaderStage::Fragment => ShaderStages::FRAGMENT,
                 crate::ShaderStage::Compute => ShaderStages::COMPUTE,
+                crate::ShaderStage::Task => ShaderStages::TASK,
+                crate::ShaderStage::Mesh => ShaderStages::TASK,
             };
 
             if !info.available_stages.contains(stage_bit) {

@@ -438,9 +438,11 @@ impl fmt::Display for VaryingName<'_> {
                     // pipeline to vertex
                     (ShaderStage::Vertex, false) => "p2vs",
                     // vertex to fragment
-                    (ShaderStage::Vertex, true) | (ShaderStage::Fragment, false) => "vs2fs",
+                    (ShaderStage::Vertex, true) | (ShaderStage::Mesh, true) | (ShaderStage::Fragment, false) => "vs2fs",
                     // fragment to pipeline
                     (ShaderStage::Fragment, true) => "fs2p",
+                    // task to mesh
+                    (ShaderStage::Task, _) | (ShaderStage::Mesh, false) => unreachable!(),
                 };
                 write!(f, "_{prefix}_location{location}",)
             }
@@ -457,6 +459,8 @@ impl ShaderStage {
             ShaderStage::Compute => "cs",
             ShaderStage::Fragment => "fs",
             ShaderStage::Vertex => "vs",
+            ShaderStage::Task => "ts",
+            ShaderStage::Mesh => "ms",
         }
     }
 }
@@ -1505,6 +1509,8 @@ impl<'a, W: Write> Writer<'a, W> {
             ShaderStage::Vertex => output,
             ShaderStage::Fragment => !output,
             ShaderStage::Compute => false,
+            ShaderStage::Task => false,
+            ShaderStage::Mesh => output
         };
 
         // Write the I/O locations, if allowed

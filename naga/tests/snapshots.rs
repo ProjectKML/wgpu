@@ -638,6 +638,8 @@ fn write_output_hlsl(
             naga::ShaderStage::Vertex => &mut config.vertex,
             naga::ShaderStage::Fragment => &mut config.fragment,
             naga::ShaderStage::Compute => &mut config.compute,
+            naga::ShaderStage::Task => todo!(),
+            naga::ShaderStage::Mesh => todo!()
         }
         .push(hlsl_snapshots::ConfigItem {
             entry_point: name.clone(),

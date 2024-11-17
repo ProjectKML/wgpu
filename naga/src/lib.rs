@@ -324,6 +324,8 @@ pub(crate) type NamedExpressions = FastIndexMap<Handle<Expression>, String>;
 pub struct EarlyDepthTest {
     pub conservative: Option<ConservativeDepth>,
 }
+
+
 /// Enables adjusting depth without disabling early Z.
 ///
 /// To use in a shader:
@@ -362,6 +364,20 @@ pub enum ShaderStage {
     Vertex,
     Fragment,
     Compute,
+    Task,
+    Mesh
+}
+
+/// Primitive type for a mesh shader
+#[derive(Clone, Copy, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[cfg_attr(feature = "deserialize", derive(Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
+#[allow(missing_docs)] // The names are self evident
+pub enum MeshPrimitiveType {
+    Points,
+    Lines,
+    Triangles
 }
 
 /// Addressing space of variables.
@@ -1690,6 +1706,7 @@ pub enum Expression {
 }
 
 pub use block::Block;
+use crate::front::wgsl;
 
 /// The value of the switch case.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
